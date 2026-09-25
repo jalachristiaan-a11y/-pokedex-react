@@ -23,6 +23,10 @@ body:has(.app-container.region) {
   background-image: url("./assets/region-bg.jpg");
 }
 
+body:has(.app-container.pcbox) {
+  background-image: url("./assets/pcbox-bg.jpg");
+}
+
 h1 {
   font-size: 2.5rem;
   color: #1a202c;
@@ -849,4 +853,106 @@ h1 {
     width: 180px;
     font-size: 0.95rem;
   }
+}
+
+.flavor-text-quote {
+  font-style: italic;
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.4;
+  margin: 0;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-left: 4px solid #ffcb05;
+  border-radius: 4px;
+}
+
+.catch-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pokeball-icon {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.catch-btn:not(.caught) .pokeball-icon {
+  filter: grayscale(100%) opacity(0.5);
+}
+
+.catch-btn:hover .pokeball-icon {
+  transform: scale(1.15);
+  filter: grayscale(0%) opacity(1);
+}
+
+.catch-btn.caught .pokeball-icon {
+  filter: drop-shadow(0 0 6px rgba(239, 83, 80, 0.8));
+}
+
+.modal-catch-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid #ccc;
+  background-color: #f8f9fa;
+  color: #333333;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.modal-pokeball-icon {
+  width: 20px;
+  height: 20px;
+}
+
+
+.modal-catch-btn.caught {
+  background-color: #ffebee;
+  border-color: #ef5350;
+  color: #c62828;
+}
+
+.modal-catch-btn.caught .modal-pokeball-icon {
+  filter: drop-shadow(0 0 4px rgba(239, 83, 80, 0.6));
+}
+
+.pc-release-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 1px solid #ffcdd2;
+  background-color: #ffebee;
+  color: #c62828;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pc-release-btn .pokeball-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.pc-release-btn:hover {
+  background-color: #e53935;
+  color: #ffffff;
+  border-color: #b71c1c;
+}
+
+.pc-release-btn:hover .pokeball-icon {
+  filter: brightness(0) invert(1);
 }

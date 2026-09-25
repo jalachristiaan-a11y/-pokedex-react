@@ -26,6 +26,8 @@ function App() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  const [pcBox, setPcBox] = useState({});
+
   const BATCH_SIZE = 40;
 
   const types = [
@@ -53,7 +55,7 @@ function App() {
     setOffset(0);
     setPokemonList([]);
     setHasMore(true);
-    
+
     if (searchTerm.trim() === "") {
       if (currentType === "all") {
         fetchAllPokemon(0, true);
@@ -82,6 +84,24 @@ function App() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const toggleCatchPokemon = (poke, e) => {
+    if (e) e.stopPropagation();
+    setPcBox((prev) => {
+      const next = { ...prev };
+      if (next[poke.id]) {
+        delete next[poke.id];
+      } else {
+        next[poke.id] = {
+          id: poke.id,
+          name: poke.name,
+          image: poke.image || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${poke.id}.png`,
+          type: poke.type || "normal"
+        };
+      }
+      return next;
+    });
+  };
 
   const fetchRegionData = async (regionName) => {
     setRegionLoading(true);
@@ -141,14 +161,30 @@ function App() {
         `https://pokeapi.co/api/v2/pokemon?limit=${BATCH_SIZE}&offset=${currentOffset}`
       );
 
-      const newPokemon = response.data.results.map((p) => {
-        const id = p.url.split("/").filter(Boolean).pop();
-        return {
-          id: parseInt(id, 10),
-          name: p.name,
-          image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-        };
-      });
+      const newPokemon = await Promise.all(
+        response.data.results.map(async (p) => {
+          const id = parseInt(p.url.split("/").filter(Boolean).pop(), 10);
+          try {
+            const detailRes = await axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`);
+            const moves = detailRes.data.moves.slice(0, 2).map((m) =>
+              m.move.name.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+            );
+            return {
+              id,
+              name: p.name,
+              image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+              moves: moves.length > 0 ? moves : ["Tackle", "Quick Attack"],
+            };
+          } catch {
+            return {
+              id,
+              name: p.name,
+              image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+              moves: ["Tackle", "Quick Attack"],
+            };
+          }
+        })
+      );
 
       if (newPokemon.length < BATCH_SIZE) {
         setHasMore(false);
@@ -166,14 +202,15 @@ function App() {
     setPokemonList([]);
     try {
       const response = await axios.get(`https://pokeapi.co/api/v2/type/${type}`);
-      
+
       const typePokemon = response.data.pokemon.map((p) => {
-        const id = p.pokemon.url.split("/").filter(Boolean).pop();
+        const id = parseInt(p.pokemon.url.split("/").filter(Boolean).pop(), 10);
         return {
-          id: parseInt(id, 10),
+          id,
           name: p.pokemon.name,
           image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
           type: type,
+          moves: ["Tackle", "Quick Attack"],
         };
       });
 
@@ -192,6 +229,9 @@ function App() {
     try {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name}`);
       const data = response.data;
+      const moves = data.moves.slice(0, 2).map((m) =>
+        m.move.name.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+      );
       setPokemonList([
         {
           id: data.id,
@@ -199,6 +239,7 @@ function App() {
           image: data.sprites.other["official-artwork"].front_default || data.sprites.front_default,
           type: data.types[0]?.type?.name || "normal",
           hp: data.stats.find((s) => s.stat.name === "hp")?.base_stat,
+          moves: moves.length > 0 ? moves : ["Tackle", "Quick Attack"],
         },
       ]);
       setHasMore(false);
@@ -213,15 +254,29 @@ function App() {
     setSelectedPokemon(poke);
     setModalLoading(true);
     try {
-      const detailsRes = await axios.get(`https://pokeapi.co/api/v2/pokemon/${poke.id}`);
+      const [detailsRes, speciesRes] = await Promise.all([
+        axios.get(`https://pokeapi.co/api/v2/pokemon/${poke.id}`),
+        axios.get(`https://pokeapi.co/api/v2/pokemon-species/${poke.id}`).catch(() => null)
+      ]);
+
       const details = detailsRes.data;
+
+      let flavorText = "No lore description available for this Pokémon.";
+      if (speciesRes && speciesRes.data.flavor_text_entries) {
+        const englishEntry = speciesRes.data.flavor_text_entries.find(
+          (entry) => entry.language.name === "en"
+        );
+        if (englishEntry) {
+          flavorText = englishEntry.flavor_text.replace(/[\n\f]/g, " ");
+        }
+      }
 
       const statMap = {};
       details.stats.forEach((s) => {
         statMap[s.stat.name] = s.base_stat;
       });
-      
-      const movesList = details.moves.slice(0, 10).map((m) =>
+
+      const movesList = details.moves.slice(0, 12).map((m) =>
         m.move.name
           .split("-")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -239,6 +294,7 @@ function App() {
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join(" ")
         ),
+        flavorText,
         stats: {
           hp: statMap["hp"] || 0,
           attack: statMap["attack"] || 0,
@@ -301,7 +357,57 @@ function App() {
         >
           Region Explorer
         </button>
+        <button
+          className={`tab-btn ${activeTab === "pcbox" ? "active" : ""}`}
+          onClick={() => setActiveTab("pcbox")}
+        >
+          My PC Box ({Object.keys(pcBox).length})
+        </button>
       </div>
+
+      {activeTab === "pcbox" && (
+        <div className="pc-box-section">
+          <div className="pc-box-header">
+            <h2>Captured Pokémon Storage</h2>
+          </div>
+
+          {Object.keys(pcBox).length === 0 ? (
+            <p className="status-text">
+              Your PC Box is empty. Catch Pokémon by clicking the Pokéball icon on their cards!
+            </p>
+          ) : (
+            <div className="pokemon-grid">
+              {Object.values(pcBox).map((poke) => (
+                <div
+                  key={poke.id}
+                  className={`tcg-card ${poke.type}`}
+                  onClick={() => handleCardClick(poke)}
+                >
+                  <div className="card-header">
+                    <span className="stage">#{String(poke.id).padStart(3, "0")}</span>
+                    <span className="poke-name">{poke.name.toUpperCase()}</span>
+                    <button
+                        className="pc-release-btn"
+                        onClick={(e) => toggleCatchPokemon(poke, e)}
+                        title="Release Pokémon"
+                    >
+                     <img
+                       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"
+                          alt="Release Pokémon"
+                           className="pokeball-icon"
+                               />
+                              <span>Release</span>
+                        </button>
+                  </div>
+                  <div className="card-image-box">
+                    <img src={poke.image} alt={poke.name} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === "region" && (
         <div className="region-explorer-section">
@@ -407,6 +513,8 @@ function App() {
           <div className="pokemon-grid">
             {pokemonList.map((poke) => {
               const primaryType = poke.type || currentType;
+              const isCaught = Boolean(pcBox[poke.id]);
+
               return (
                 <div 
                   key={poke.id} 
@@ -416,6 +524,21 @@ function App() {
                   <div className="card-header">
                     <span className="stage">#{String(poke.id).padStart(3, "0")}</span>
                     <span className="poke-name">{poke.name.toUpperCase()}</span>
+                   <button
+                   className={`catch-btn ${isCaught ? "caught" : ""}`}
+                   onClick={(e) => toggleCatchPokemon(poke, e)}
+                   title={isCaught ? "Release Pokémon" : "Catch Pokémon"}
+                >
+                <img
+                         src={
+                        isCaught
+                        ? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png" 
+                    : "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"
+                    }
+                   alt="Pokeball"
+                       className="pokeball-icon"
+  />
+</button>
                     <span className="hp-val">HP {poke.hp || 60}</span>
                   </div>
 
@@ -426,11 +549,11 @@ function App() {
                   <div className="card-moves">
                     <div className="move-row">
                       <span className="move-label">Primary</span>
-                      <span className="move-name">Tackle</span>
+                      <span className="move-name">{poke.moves?.[0] || "Tackle"}</span>
                     </div>
                     <div className="move-row">
                       <span className="move-label">Secondary</span>
-                      <span className="move-name">Quick Attack</span>
+                      <span className="move-name">{poke.moves?.[1] || "Quick Attack"}</span>
                     </div>
                   </div>
 
@@ -472,6 +595,21 @@ function App() {
               <h2 className="modal-poke-title">
                 {selectedPokemon.name.toUpperCase()}
               </h2>
+            <button
+                className={`modal-catch-btn ${pcBox[selectedPokemon.id] ? "caught" : ""}`}
+               onClick={(e) => toggleCatchPokemon(selectedPokemon, e)}
+              >
+              <img
+                 src={
+                  pcBox[selectedPokemon.id]
+                     ? "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png"
+                        : "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"
+                        }
+                           alt="Pokeball"
+                     className="modal-pokeball-icon"
+                    />
+                 <span>{pcBox[selectedPokemon.id] ? "Captured" : "Catch"}</span>
+</button>
             </div>
 
             {modalLoading ? (
@@ -485,6 +623,11 @@ function App() {
                         src={selectedPokemon.image}
                         alt={selectedPokemon.name}
                       />
+                    </div>
+
+                    <div className="modal-section-box">
+                      <h4>Pokédex Entry</h4>
+                      <p className="flavor-text-quote">"{modalData.flavorText}"</p>
                     </div>
 
                     <div className="modal-section-box">

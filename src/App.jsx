@@ -197,7 +197,7 @@ function App() {
           id: data.id,
           name: data.name,
           image: data.sprites.other["official-artwork"].front_default || data.sprites.front_default,
-          type: data.types[0].type.name,
+          type: data.types[0]?.type?.name || "normal",
           hp: data.stats.find((s) => s.stat.name === "hp")?.base_stat,
         },
       ]);
@@ -208,6 +208,7 @@ function App() {
     }
     setLoading(false);
   };
+
   const handleCardClick = async (poke) => {
     setSelectedPokemon(poke);
     setModalLoading(true);
@@ -284,7 +285,7 @@ function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${activeTab}`}>
       <h1>Pokédex</h1>
 
       <div className="tab-navigation">
@@ -298,7 +299,7 @@ function App() {
           className={`tab-btn ${activeTab === "region" ? "active" : ""}`}
           onClick={() => setActiveTab("region")}
         >
-           Region Explorer
+          Region Explorer
         </button>
       </div>
 
@@ -445,6 +446,10 @@ function App() {
 
           {loading && <p className="status-text">Loading Pokémon...</p>}
 
+          {!loading && pokemonList.length === 0 && searchTerm && (
+            <p className="status-text">No Pokémon found matching "{searchTerm}"</p>
+          )}
+
           {!loading && currentType === "all" && !searchTerm && hasMore && (
             <button className="load-more-btn" onClick={handleLoadMore}>
               Load More Pokémon
@@ -485,8 +490,8 @@ function App() {
                     <div className="modal-section-box">
                       <h4>Type</h4>
                       <div className="modal-pill-group">
-                        {modalData.types.map((t) => (
-                          <span key={t} className={`type-badge ${t}`}>
+                        {modalData.types.map((t, idx) => (
+                          <span key={`${t}-${idx}`} className={`type-badge ${t}`}>
                             {t.charAt(0).toUpperCase() + t.slice(1)}
                           </span>
                         ))}
@@ -496,8 +501,8 @@ function App() {
                     <div className="modal-section-box">
                       <h4>Abilities</h4>
                       <div className="modal-pill-group">
-                        {modalData.abilities.map((ability) => (
-                          <span key={ability} className="info-pill">
+                        {modalData.abilities.map((ability, idx) => (
+                          <span key={`${ability}-${idx}`} className="info-pill">
                             {ability}
                           </span>
                         ))}
@@ -534,7 +539,7 @@ function App() {
                       <h4>Statistics</h4>
                       <div className="stat-bars-wrapper">
                         <div className="stat-line">
-                          <span className="stat-title">Hp</span>
+                          <span className="stat-title">HP</span>
                           <div className="stat-bar-bg">
                             <div
                               className="stat-bar-fill"
